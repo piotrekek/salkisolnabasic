@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pl" class="overflow-x-hidden">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="theme-color" content="#090d16">
+    <title>Samorząd Solnej POSM</title>
+    
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo-192.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
+        }
+    </script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    <style>
+        input.input-classic, textarea.input-classic, select.input-classic { background-color: #0f0f14 !important; color: #ffffff !important; caret-color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.16) !important; color-scheme: dark; }
+        input.input-classic:-webkit-autofill, input.input-classic:-webkit-autofill:hover, input.input-classic:-webkit-autofill:focus, input.input-classic:-webkit-autofill:active { -webkit-box-shadow: 0 0 0 1000px #0f0f14 inset !important; -webkit-text-fill-color: #ffffff !important; caret-color: #ffffff !important; transition: background-color 5000s ease-in-out 0s; }
+        
+        .text-glow { text-shadow: 0 0 16px rgba(255, 255, 255, 0.28), 0 4px 20px rgba(99, 102, 241, 0.2); }
+        
+        @keyframes fadeInUpOriginal { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeInUpOriginal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        .profile-hero-card {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(24, 24, 30, 0.85) 0%, rgba(16, 20, 34, 0.82) 100%);
+            transition: border-color 0.35s ease, box-shadow 0.35s ease;
+        }
+        .profile-ambient-orb {
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            border-radius: 9999px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+            top: -90px;
+            right: -70px;
+            pointer-events: none;
+        }
+        .profile-stat-box {
+            background: rgba(12, 14, 22, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        @keyframes slideOutLeftAnim { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-40px); opacity: 0; } }
+        @keyframes slideOutRightAnim { from { transform: translateX(0); opacity: 1; } to { transform: translateX(40px); opacity: 0; } }
+        @keyframes slideInRightAnim { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInLeftAnim { from { transform: translateX(-40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .anim-slide-out-left { animation: slideOutLeftAnim 0.3s forwards cubic-bezier(0.4, 0, 0.2, 1); }
+        .anim-slide-out-right { animation: slideOutRightAnim 0.3s forwards cubic-bezier(0.4, 0, 0.2, 1); }
+        .anim-slide-in-right { animation: slideInRightAnim 0.3s forwards cubic-bezier(0.4, 0, 0.2, 1); }
+        .anim-slide-in-left { animation: slideInLeftAnim 0.3s forwards cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="min-h-screen relative overflow-x-hidden flex flex-col pt-[env(safe-area-inset-top)] bg-[#090d16]">
+
+    <div id="custom-alert-modal" class="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 transition-opacity">
+        <div class="bg-[#0f1423] border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl flex flex-col items-center text-center scale-95 transition-transform" id="custom-alert-box">
+            <h3 class="text-xl font-black text-white mb-2" id="custom-alert-title"></h3>
+            <p class="text-sm text-zinc-400 mb-6" id="custom-alert-text"></p>
+            <button onclick="zamknijAlert()" class="btn-classic-primary w-full py-3.5 rounded-xl font-bold text-sm shadow-lg">Zrozumiałem</button>
+        </div>
+    </div>
+    
+    <div id="custom-confirm-modal" class="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 transition-opacity">
+        <div class="bg-[#0f1423] border border-white/10 p-6 rounded-3xl w-full max-w-sm shadow-2xl flex flex-col items-center text-center scale-95 transition-transform" id="custom-confirm-box">
+            <h3 class="text-xl font-black text-white mb-2" id="custom-confirm-title"></h3>
+            <p class="text-sm text-zinc-400 mb-6" id="custom-confirm-text"></p>
+            <div class="flex gap-3 w-full">
+                <button onclick="zamknijConfirm()" class="flex-1 bg-white/5 hover:bg-white/10 text-white py-3.5 rounded-xl font-bold text-sm transition-colors border border-white/10">Anuluj</button>
+                <button id="custom-confirm-btn" class="flex-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/50 py-3.5 rounded-xl font-bold text-sm transition-colors">Potwierdź</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ekran-powitania" class="hidden fixed inset-0 z-[100] bg-[#090d16] flex-col items-center justify-center transition-opacity duration-700"></div>
+
+    <div id="ekran-logowania" class="hidden min-h-[90vh] flex-col items-center justify-center p-4 relative">
+        <a href="https://muzycznanasolnej.pl/" class="absolute top-4 left-4 flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-zinc-400 hover:text-white z-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+            <span class="text-xs font-bold hidden sm:block">Szkoła</span>
+        </a>
+
+        <div class="glass-panel p-6 sm:p-8 w-full max-w-md relative overflow-hidden mt-8">
+            <div class="flex items-center gap-3.5 mb-7">
+                <div class="w-12 h-12 rounded-2xl overflow-hidden bg-white border border-white/15 shrink-0 shadow-md">
+                    <img src="logo.png" alt="Logo" class="w-full h-full object-cover scale-125" onerror="this.style.display='none'">
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">Samorząd Solnej</h1>
+                    <span class="emblem emblem-indigo mt-1">Portal Ucznia POSM</span>
+                </div>
+            </div>
+
+            <form onsubmit="event.preventDefault(); zalogujUcznia();" class="flex flex-col gap-4 mb-6">
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Login</label>
+                    <input type="text" id="login-input" autocapitalize="none" autocorrect="off" class="input-classic w-full rounded-xl px-4 py-3.5">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Hasło</label>
+                    <input type="password" id="haslo-input" class="input-classic w-full rounded-xl px-4 py-3.5">
+                </div>
+                <button type="submit" class="btn-classic-primary w-full py-3.5 rounded-xl font-bold text-sm mt-2">Zaloguj się</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="ekran-zmiany-hasla" class="hidden min-h-[90vh] flex-col items-center justify-center p-4 relative">
+        <div class="glass-panel p-6 sm:p-8 w-full max-w-md mt-8">
+            <span class="emblem emblem-amber mb-3">Pierwsze logowanie</span>
+            <h2 class="text-xl font-bold text-white mb-6">Ustaw prywatne hasło</h2>
+            <div class="flex flex-col gap-4 mb-6">
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Nowe hasło</label>
+                    <input type="password" id="nowe-haslo-1" class="input-classic w-full rounded-xl px-4 py-3.5">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Powtórz hasło</label>
+                    <input type="password" id="nowe-haslo-2" class="input-classic w-full rounded-xl px-4 py-3.5">
+                </div>
+            </div>
+            <button onclick="zapiszNoweHaslo()" class="btn-classic-primary w-full py-3.5 rounded-xl font-bold text-sm">Zapisz hasło</button>
+        </div>
+    </div>
+
+    <div id="ekran-glowny" class="hidden flex-col min-h-screen pb-12 w-full max-w-full overflow-x-hidden">
+        <nav class="glass-panel mx-2.5 sm:mx-4 mt-3 sm:mt-4 px-3.5 sm:px-6 py-3 sticky top-3 z-40 flex flex-col md:flex-row justify-between items-center gap-3 max-w-7xl xl:mx-auto w-auto">
+            <div class="flex items-center justify-between w-full md:w-auto">
+                <div class="flex items-center gap-3">
+                    <a href="https://muzycznanasolnej.pl/" class="flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors shrink-0 text-zinc-300 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </a>
+                    <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-white border border-white/15 shrink-0 shadow-md">
+                        <img src="logo.png" alt="Logo" class="w-full h-full object-cover scale-125" onerror="this.style.display='none'">
+                    </div>
+                    <div>
+                        <h1 class="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">Samorząd Solnej</h1>
+                        <p id="nav-uczen-info" class="text-[11px] text-indigo-400 font-semibold truncate max-w-[190px] sm:max-w-xs">-</p>
+                    </div>
+                </div>
+                <div class="flex md:hidden items-center gap-1.5">
+                    <button onclick="wylogujUcznia()" class="btn-classic-secondary px-3 py-2 rounded-xl text-xs font-semibold shrink-0">Wyloguj</button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto justify-start md:justify-center bg-zinc-950/70 p-1.5 rounded-2xl border border-white/10">
+                <button onclick="przelaczZakladkeUcznia('start')" id="tab-uczen-start" class="nav-tab shrink-0 text-center active">Mój Profil</button>
+                <button onclick="przelaczZakladkeUcznia('salki')" id="tab-uczen-salki" class="nav-tab shrink-0 text-center">Salki</button>
+                <button onclick="przelaczZakladkeUcznia('glosowania')" id="tab-uczen-glosowania" class="nav-tab shrink-0 flex items-center justify-center gap-1.5">
+                    <span>Głosowania</span>
+                    <span id="badge-ankiety-count" class="hidden bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">0</span>
+                </button>
+                <button onclick="przelaczZakladkeUcznia('propozycje')" id="tab-uczen-propozycje" class="nav-tab shrink-0 text-center">Propozycje</button>
+                <button onclick="przelaczZakladkeUcznia('panel-samorzadu')" id="tab-uczen-panel-samorzadu" class="hidden nav-tab shrink-0 text-center border border-indigo-500/50 text-indigo-300">Zarządzaj</button>
+            </div>
+
+            <div class="hidden md:flex items-center gap-2.5">
+                <button onclick="wylogujUcznia()" class="btn-classic-secondary px-4 py-2.5 rounded-xl text-xs font-semibold">Wyloguj</button>
+            </div>
+        </nav>
+
+        <div id="widok-start" class="max-w-5xl mx-auto p-2.5 sm:p-4 mt-1 flex-grow w-full flex flex-col gap-4 sm:gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-panel profile-hero-card p-5 sm:p-6 md:col-span-2 flex flex-col justify-between gap-4">
+                    <div class="profile-ambient-orb"></div>
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div id="start-avatar-box" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-zinc-800/90 border border-white/15 flex items-center justify-center text-xl sm:text-2xl font-black text-white overflow-hidden shadow-lg shrink-0">
+                            -
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="emblem emblem-indigo mb-1.5 block w-max">Twój Profil</span>
+                            <h2 id="start-powitanie" class="text-2xl sm:text-3xl font-bold text-white tracking-tight">-</h2>
+                            <p id="start-klasa" class="text-xs sm:text-sm text-zinc-400 mt-1">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10 relative z-10">
+                        <div class="profile-stat-box rounded-xl p-3.5">
+                            <span id="label-instr-1" class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Główny instrument</span>
+                            <span id="start-instr-1" class="text-sm font-bold text-white mt-0.5 block">-</span>
+                        </div>
+                        <div class="profile-stat-box rounded-xl p-3.5">
+                            <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Drugi instrument</span>
+                            <span id="start-instr-2" class="text-sm font-bold text-indigo-300 mt-0.5 block">Brak</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 sm:p-6 flex flex-col justify-between gap-4">
+                    <div>
+                        <span class="emblem emblem-emerald mb-2">Stan Sal na Żywo</span>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <span id="start-wolne-liczba" class="text-3xl font-extrabold text-emerald-400">0</span>
+                            <span class="text-xs text-zinc-400">wolnych ze wszystkich</span>
+                        </div>
+                        <p class="text-[11px] text-zinc-400 mt-2 leading-relaxed">
+                            Pon–Pt: 7:00–21:00 (klucze do 20:00)<br>
+                            Sobota: 8:00–17:00 (17–19 zgoda)<br>
+                            Niedziela: 8:00–19:00 (tylko zgoda)
+                        </p>
+                    </div>
+                    <button onclick="przelaczZakladkeUcznia('salki')" class="btn-classic-primary w-full py-3 rounded-xl text-xs font-bold">Przejdź do tablicy sal</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:gap-5">
+                <div class="glass-panel p-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="emblem emblem-emerald">Twoje Zgody Weekendowe</span>
+                    </div>
+                    <div id="start-lista-zgod" class="flex flex-col gap-2.5"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button type="button" onclick="otworzModalZmianyHasla()" class="text-xs font-semibold text-zinc-500 hover:text-zinc-300 transition-colors">
+                    Zmień hasło do konta
+                </button>
+            </div>
+        </div>
+
+        <div id="widok-salki" class="hidden max-w-7xl mx-auto p-2.5 sm:p-4 mt-1 flex-grow w-full flex-col gap-4 sm:gap-5">
+            <div class="glass-panel p-3.5 sm:p-5 flex flex-col justify-between items-start gap-3.5 border-b-2 border-b-indigo-500/30">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-3">
+                    <div class="flex gap-2 overflow-x-auto no-scrollbar w-full md:w-auto pb-0.5" id="filtry-sal-kontener">
+                        <button onclick="ustawFiltr('wszystkie')" id="btn-wszystkie" class="filtr-btn active">Wszystkie</button>
+                        <button onclick="ustawFiltr('wolne')" id="btn-wolne" class="filtr-btn">Tylko wolne</button>
+                        <button onclick="ustawFiltr('fortepian')" id="btn-fortepian" class="filtr-btn">Z fortepianem</button>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 bg-zinc-950/70 p-1.5 rounded-xl border border-white/10 shrink-0 w-full md:w-auto justify-center">
+                        <button onclick="zmienWizualizacje('klasyczna')" id="btn-wiz-klasyczna" class="px-4 py-2 rounded-lg text-xs font-bold bg-white/10 text-white transition-all w-1/2 md:w-auto text-center">Widok Bloków</button>
+                        <button onclick="zmienWizualizacje('fizyczna')" id="btn-wiz-fizyczna" class="px-4 py-2 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all w-1/2 md:w-auto text-center">Prawdziwa Tablica</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5 text-xs font-semibold">
+                    <span class="emblem emblem-emerald"><span class="status-dot dot-emerald"></span>Wolna</span>
+                    <span class="emblem emblem-rose"><span class="status-dot dot-rose"></span>Zajęta</span>
+                    <span class="emblem emblem-purple"><span class="status-dot dot-purple"></span>Blokada</span>
+                    <div class="flex items-center gap-1 ml-1 text-slate-300">
+                        <span class="w-2 h-2 rounded-full bg-white inline-block shadow-md ml-1.5 mr-0.5"></span> Pracownik szkoły
+                    </div>
+                </div>
+            </div>
+
+            <div id="kontener-klasyczny" class="flex flex-col gap-4 sm:gap-5">
+                <div id="sekcja-ulubione" class="hidden glass-panel p-4 sm:p-6 mb-2 border-amber-400/30 w-full">
+                    <div class="mb-3.5 block w-full"><span class="emblem emblem-gold inline-block">Ulubione sale</span></div>
+                    <div id="grid-ulubione" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3 w-full"></div>
+                </div>
+                <div class="glass-panel p-4 sm:p-6">
+                    <div class="flex items-center gap-2 mb-3.5"><span class="emblem emblem-rose">II stopień</span></div>
+                    <div id="grid-IIst" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3"></div>
+                </div>
+                <div class="glass-panel p-4 sm:p-6">
+                    <div class="flex items-center gap-2 mb-3.5"><span class="emblem emblem-emerald">I stopień</span></div>
+                    <div id="grid-Ist" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3"></div>
+                </div>
+                <div class="glass-panel p-4 sm:p-6">
+                    <div class="flex items-center gap-2 mb-3.5"><span class="emblem emblem-indigo">Sale jazzowe</span></div>
+                    <div id="grid-jazz" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 sm:gap-3"></div>
+                </div>
+                <div class="glass-panel p-4 sm:p-6">
+                    <div class="flex items-center gap-2 mb-3.5"><span class="emblem emblem-amber">Inne</span></div>
+                    <div id="grid-inne" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3"></div>
+                </div>
+            </div>
+
+            <div id="kontener-fizyczny" class="hidden glass-panel p-2 sm:p-4 overflow-x-auto w-full no-scrollbar border-indigo-500/25 border-2 relative">
+                <div id="grid-fizyczny" class="grid gap-1.5 pb-2 mx-auto" style="grid-template-columns: repeat(20, minmax(42px, 1fr)); min-width: 980px;"></div>
+            </div>
+        </div>
+
+        <div id="widok-glosowania" class="hidden max-w-4xl mx-auto p-2.5 sm:p-4 mt-1 flex-grow w-full flex-col gap-4">
+            <div id="lista-ankiet-uczen" class="flex flex-col gap-4"></div>
+        </div>
+
+        <div id="widok-propozycje" class="hidden max-w-4xl mx-auto p-2.5 sm:p-4 mt-1 flex-grow w-full flex-col gap-4">
+            <div class="glass-panel p-4 sm:p-5 flex justify-between items-center">
+                <span class="emblem emblem-indigo">Propozycje Uczniów</span>
+                <button onclick="otworzModalNowejPropozycji()" class="btn-classic-primary w-10 h-10 rounded-xl font-bold text-xl flex items-center justify-center leading-none shadow-lg" title="Dodaj propozycję">+</button>
+            </div>
+            <div id="lista-propozycji-uczen" class="flex flex-col gap-4"></div>
+        </div>
+
+        <div id="widok-panel-samorzadu" class="hidden max-w-5xl mx-auto p-2.5 sm:p-4 mt-1 flex-grow w-full flex-col gap-6">
+            <div class="glass-panel p-5 sm:p-6 border-t-2 border-t-indigo-400">
+                <span class="emblem emblem-indigo mb-2">Głosowania</span>
+                <h2 class="text-xl font-bold text-white mb-4">Utwórz nową ankietę</h2>
+                <div class="flex flex-col gap-3">
+                    <input type="text" id="nowa-ankieta-tytul" placeholder="Tytuł ankiety..." class="input-classic w-full rounded-xl px-4 py-3">
+                    <textarea id="nowa-ankieta-opis" placeholder="Opis (opcjonalnie)..." class="input-classic w-full rounded-xl px-4 py-3 resize-none"></textarea>
+                    <input type="text" id="nowa-ankieta-opcje" placeholder="Opcje (np. Tak, Nie, Wstrzymuję się)..." class="input-classic w-full rounded-xl px-4 py-3">
+                    <button type="button" onclick="dodajAnkieteSamorzad()" class="btn-classic-primary w-full py-3.5 rounded-xl font-bold text-sm">Opublikuj ankietę</button>
+                </div>
+                <div id="lista-ankiet-zarzadzanie" class="flex flex-col gap-3 mt-6 max-h-[400px] overflow-y-auto no-scrollbar border-t border-white/10 pt-4"></div>
+            </div>
+
+            <div class="glass-panel p-5 sm:p-6 border-t-2 border-t-amber-400">
+                <span class="emblem emblem-amber mb-2">Propozycje Uczniów</span>
+                <h2 class="text-xl font-bold text-white mb-4">Moderacja, głosy i odpowiedzi</h2>
+                <div id="lista-propozycji-zarzadzanie" class="flex flex-col gap-4 max-h-[600px] overflow-y-auto no-scrollbar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-sala-uczen" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50 p-4">
+        <div class="glass-panel p-6 sm:p-7 w-full max-w-md relative animate-scale-in max-h-[90vh] overflow-y-auto">
+            <button onclick="zamknijModalSali()" class="absolute top-3.5 right-4 text-zinc-400 hover:text-white text-2xl leading-none p-1">&times;</button>
+            <div class="flex items-center gap-3 mb-4">
+                <h3 class="text-xl font-bold text-white">Sala <span id="akcja-sala-nr" class="text-indigo-400"></span></h3>
+                <div id="akcja-sala-status"></div>
+            </div>
+            <button id="btn-toggle-ulubiona" onclick="przelaczUlubionaSale()" class="w-full mb-5 py-3.5 rounded-xl font-bold text-xs sm:text-sm border transition-all"></button>
+            <div class="border-t border-white/10 pt-4">
+                <label class="block text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Zgłoś usterkę</label>
+                <textarea id="opis-usterki-input" rows="2" class="input-classic bg-[#0f0f14] text-white w-full rounded-xl p-3.5 resize-none mb-3"></textarea>
+                <button onclick="wyslijZgloszenieUsterki()" class="btn-classic-secondary w-full py-3.5 rounded-xl font-bold text-xs sm:text-sm">Wyślij zgłoszenie</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-nowa-propozycja" class="fixed inset-0 modal-overlay hidden items-center justify-center z-50 p-4">
+        <div class="glass-panel p-6 sm:p-7 w-full max-w-lg relative animate-scale-in">
+            <button onclick="zamknijModalNowejPropozycji()" class="absolute top-3.5 right-4 text-zinc-400 hover:text-white text-2xl leading-none p-1">&times;</button>
+            <span class="emblem emblem-indigo mb-3">Nowa propozycja</span>
+            <div class="flex flex-col gap-3.5 mt-2">
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Tytuł</label>
+                    <input type="text" id="prop-tytul" class="input-classic bg-[#0f0f14] text-white mt-1 w-full rounded-xl px-4 py-3">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Treść</label>
+                    <textarea id="prop-opis" rows="4" class="input-classic bg-[#0f0f14] text-white mt-1 w-full rounded-xl p-4 resize-none"></textarea>
+                </div>
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 pt-2">
+                    <label class="toggle-switch-wrap">
+                        <input type="checkbox" id="prop-anonim" class="sr-only">
+                        <span class="toggle-slider"></span>
+                        <span class="text-xs sm:text-sm font-semibold text-zinc-200">Opublikuj anonimowo</span>
+                    </label>
+                    <button onclick="dodajPropozycje()" class="btn-classic-primary w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-xs sm:text-sm">Opublikuj</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-zmiana-hasla-dobrowolna" class="fixed inset-0 z-[990] modal-overlay hidden items-center justify-center p-4">
+        <div class="glass-panel p-6 sm:p-7 w-full max-w-md relative flex flex-col animate-scale-in">
+            <button onclick="ukryjEkran('modal-zmiana-hasla-dobrowolna')" class="absolute top-3.5 right-4 text-zinc-400 hover:text-white text-2xl leading-none p-1">&times;</button>
+            <span class="emblem emblem-amber mb-2 w-max">Bezpieczeństwo</span>
+            <h3 class="text-lg font-bold text-white mb-4">Zmień hasło do konta</h3>
+            <div class="flex flex-col gap-3.5 mb-6">
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Obecne hasło</label>
+                    <input type="password" id="zmiana-obecne-haslo" class="input-classic w-full rounded-xl px-4 py-3 mt-1">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Nowe hasło (min. 4 znaki)</label>
+                    <input type="password" id="zmiana-nowe-haslo-1" class="input-classic w-full rounded-xl px-4 py-3 mt-1">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-zinc-400 uppercase tracking-wider ml-1">Powtórz nowe hasło</label>
+                    <input type="password" id="zmiana-nowe-haslo-2" class="input-classic w-full rounded-xl px-4 py-3 mt-1">
+                </div>
+            </div>
+            <div class="flex gap-2.5">
+                <button type="button" onclick="ukryjEkran('modal-zmiana-hasla-dobrowolna')" class="btn-classic-secondary px-5 py-3 rounded-xl font-bold text-xs">Anuluj</button>
+                <button type="button" onclick="zatwierdzDobrowolnaZmianeHasla()" class="btn-classic-primary flex-1 py-3 rounded-xl font-bold text-xs">Zaktualizuj hasło</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-podglad-glosow" class="fixed inset-0 z-[992] modal-overlay hidden items-center justify-center p-4">
+        <div class="glass-panel p-6 sm:p-7 w-full max-w-lg relative flex flex-col max-h-[85vh] animate-scale-in">
+            <button onclick="ukryjEkran('modal-podglad-glosow')" class="absolute top-3.5 right-4 text-zinc-400 hover:text-white text-2xl leading-none p-1">&times;</button>
+            <span class="emblem emblem-indigo mb-1.5 w-max">Wykaz imienny</span>
+            <h3 id="podglad-glosow-tytul" class="text-lg font-bold text-white mb-4 pr-6">Szczegóły głosowania</h3>
+            <div id="podglad-glosow-lista" class="flex flex-col gap-3 overflow-y-auto no-scrollbar pr-1 flex-grow"></div>
+            <button type="button" onclick="ukryjEkran('modal-podglad-glosow')" class="btn-classic-secondary w-full py-3 rounded-xl font-bold text-xs mt-5 shrink-0">Zamknij</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
